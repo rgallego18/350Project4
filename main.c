@@ -6,10 +6,17 @@ int* mat2 = NULL;
 int* matRes = NULL;
 int* matSol = NULL;
 
+// Thread arguments structure
+typedef struct {
+    int startRow;
+    int endRow;
+} ThreadArgs;
+
+// Single-threaded matrix multiplication
 void multiply() {
     for (int i = 0; i < M; i++) {
         for (int j = 0; j < K; j++) {
-            matRes[i * K + j] = 0;
+            matRes[i * K + j] = 0; // Initialize result matrix cell
             for (int k = 0; k < N; k++) {
                 matRes[i * K + j] += mat1[i * N + k] * mat2[k * K + j];
             }
@@ -17,43 +24,48 @@ void multiply() {
     }
 }
 
-typedef struct {
-    int thread_id;
-    int nthreads;
-} ThreadArg;
+// Multi-threaded matrix multiplication
+void* multiplyRows(void* args) {
+    ThreadArgs* targs = (ThreadArgs*)args;
+    int startRow = targs->startRow;
+    int endRow = targs->endRow;
 
-void *threadMultiply(void *arg) {
-    ThreadArg *data = (ThreadArg *)arg;
-    int thread_id = data->thread_id;
-    int nthreads = data->nthreads;
-
-    for (int i = thread_id; i < M; i += nthreads) {
+    for (int i = startRow; i < endRow; i++) {
         for (int j = 0; j < K; j++) {
-            matRes[i * K + j] = 0;
+            matRes[i * K + j] = 0; // Initialize result matrix cell
             for (int k = 0; k < N; k++) {
                 matRes[i * K + j] += mat1[i * N + k] * mat2[k * K + j];
             }
         }
     }
-
-    pthread_exit(NULL);
+    return NULL;
 }
 
-void multiplyWithThreads(int nThreads){
+void multiplyWithThreads(int nThreads) {
     pthread_t threads[nThreads];
-    ThreadArg threadArgs[nThreads];
+    ThreadArgs targs[nThreads];
+    int rowsPerThread = M / nThreads; // Divide rows evenly
+    int remainingRows = M % nThreads; // Handle leftover rows
 
-    for (int i = 0; i < nThreads; i++) {
-        threadArgs[i].thread_id = i;
-        threadArgs[i].nthreads = nThreads;
-        pthread_create(&threads[i], NULL, threadMultiply, &threadArgs[i]);
+    // Create threads and assign rows
+    for (int t = 0; t < nThreads; t++) {
+        targs[t].startRow = t * rowsPerThread;
+        targs[t].endRow = (t + 1) * rowsPerThread;
+
+        if (t == nThreads - 1) {
+            targs[t].endRow += remainingRows; // Add leftover rows to the last thread
+        }
+
+        pthread_create(&threads[t], NULL, multiplyRows, &targs[t]);
     }
 
-    for (int i = 0; i < nThreads; i++) {
-        pthread_join(threads[i], NULL);
+    // Wait for all threads to complete
+    for (int t = 0; t < nThreads; t++) {
+        pthread_join(threads[t], NULL);
     }
-    printMats();
 }
+
+
 
 //--- DO NOT MODIFY BELOW HERE ---
 int main(int argc, char* argv[])
