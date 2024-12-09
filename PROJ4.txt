@@ -1,0 +1,6 @@
+Group members: Ryan Gallego
+
+Status of implementation: completed
+
+Ryan:
+Did assignment, including Questions 1, 2, and 3
